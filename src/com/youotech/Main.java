@@ -9,7 +9,12 @@ import utils.PropertiesUtils;
 import utils.Tools;
 
 import java.sql.Connection;
+import java.sql.Time;
 import java.util.*;
+
+import static com.youotech.timer.Timer.SINGER_IP_TIMER_UNUSED;
+import static com.youotech.timer.Timer.SINGER_IP_TIMER_USED;
+import static com.youotech.timer.TimerThread.SYNCHRONIZED_FLAG;
 
 public class Main{
 
@@ -17,7 +22,6 @@ public class Main{
 
     private TimerTask timerTask;
     
-    private static Boolean isRunning = false;//start()方法是否运行完成
 
     public static void main(String[] args) {
 
@@ -28,27 +32,29 @@ public class Main{
     /**
      * 执行定时器任务
      */
-    public void executeTimer(int hour,int minute,int second){
-        LOGGER.info("定时器时间:" + hour + ":" + minute + ":" + second);
-        isRunning = true;//等待执行也算执行,防止新定时器没有执行就被取消
+    public void executeTimer(com.youotech.timer.Timer ipTimer){
+
+        Time time = ipTimer.getTime();
+        LOGGER.info("定时器时间:" + time.toString());
+
         //执行任务时间
 	    Calendar calendar = Calendar.getInstance();
-	    calendar.set(Calendar.HOUR_OF_DAY, hour);// 控制时
-	    calendar.set(Calendar.MINUTE, minute);// 控制分
-	    calendar.set(Calendar.SECOND, second);// 控制秒
-	    Date time = calendar.getTime();
+	    calendar.set(Calendar.HOUR_OF_DAY, time.getHours());// 控制时
+	    calendar.set(Calendar.MINUTE, time.getMinutes());// 控制分
+	    calendar.set(Calendar.SECOND, time.getSeconds());// 控制秒
+	    Date date = calendar.getTime();
 	    Timer timer = new Timer();
 	    timerTask = new TimerTask() {
             @Override
             public void run() {
                 try {
-                    new Main().start();
+                    new Main().start(ipTimer);
                 }catch (Exception e){
                     e.printStackTrace();
                 }
             }
         };
-	    timer.scheduleAtFixedRate(timerTask, time,1000 * PropertiesUtils.getPeriod());
+	    timer.scheduleAtFixedRate(timerTask, date,1000 * PropertiesUtils.getPeriod());
     }
 
     /**
@@ -56,34 +62,21 @@ public class Main{
      */
     public void closeTimer(){
         try {
-            if (!isRunning) {
+            if (timerTask != null) {
                 LOGGER.info("定时器任务已取消");
                 timerTask.cancel();
-            }else {
-                LOGGER.error("取消定时器失败,有正在运行的任务");
             }
         }catch (Exception e){
             e.printStackTrace();
         }
     }
-    private void start(){
 
-        isRunning = true;//标志位变为正在运行
+    private void start(com.youotech.timer.Timer timer){
 
-        for (int i = 0;i < 10;i ++){
-            try{
-                System.out.println("临时任务:" + i);
-                Thread.sleep(1000);
-
-            }catch (Exception e){
-                e.printStackTrace();
-            }
-        }
-
-        /*Data data = new Data();
+        Data data = new Data();
 	    Connection connection = data.getConnection();//获取数据库连接
 
-	    String osName = PropertiesUtils.getOsName();//操作系统名称
+	    /*String osName = PropertiesUtils.getOsName();//操作系统名称
 	    String osArch = PropertiesUtils.getOsArch();//操作系统构架
 	    LOGGER.info(String.format("本机操作系统名称:%s,架构:%s",osName,osArch));
 
@@ -141,19 +134,18 @@ public class Main{
         for (String s:errSoftList){
             logStr.append(s).append(",");
         }
-	    data.insertLog(connection,"1",logStr.toString());
+	    data.insertLog(connection,"1",logStr.toString());*/
 
-	    data.closeConnection(connection);//关闭数据库连接*/
+	    System.out.println("-----------运行-----------");
 
-        isRunning = false;//标志位变为没有在运行
-    }
+        if (timer.getFlag() == SINGER_IP_TIMER_UNUSED) {
+            synchronized (SYNCHRONIZED_FLAG) {
+                TimerThread.flag = SINGER_IP_TIMER_USED;
+            }
+            //更新指定ip标志
+            data.updateSingleIpTimer(connection,timer.getIp());
+        }
 
-    /**
-     * 获取当前start()是否运行在运行
-     * @return true:在运行,false:没有运行
-     */
-    public boolean getStatus(){
-
-        return isRunning;
+        data.closeConnection(connection);//关闭数据库连接
     }
 }

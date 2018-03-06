@@ -1,5 +1,6 @@
 package com.youotech.database;
 
+import com.youotech.timer.Timer;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import utils.PropertiesUtils;
@@ -76,19 +77,27 @@ public class Data {
 		}catch (Exception e){
 			LOGGER.info("错误信息:" + e.toString());
 		}finally {
+            try {
+                Objects.requireNonNull(resultSet).close();
+            }catch (Exception e){
+                e.printStackTrace();
+            }
 			try {
 				Objects.requireNonNull(statement).close();
-			}catch (Exception e){
-				e.printStackTrace();
-			}
-			try {
-				Objects.requireNonNull(resultSet).close();
 			}catch (Exception e){
 				e.printStackTrace();
 			}
 		}
 		return Arrays.asList(tcpList,udpList,softList);
 	}
+
+    /**
+     * 删除当天的扫描结果,插入新的扫描结果
+     * @param connection
+     * @param list
+     * @param sdId
+     * @param flag
+     */
 	public void insertResult(Connection connection, List<String> list,int sdId,int flag){
 
 		Statement deleteStatement = null;
@@ -169,13 +178,13 @@ public class Data {
 		}catch (Exception e){
 			LOGGER.info("错误信息:" + e.toString());
 		}finally {
+            try {
+                Objects.requireNonNull(resultSet).close();
+            }catch (Exception e){
+                e.printStackTrace();
+            }
 			try {
 				Objects.requireNonNull(statement).close();
-			}catch (Exception e){
-				e.printStackTrace();
-			}
-			try {
-				Objects.requireNonNull(resultSet).close();
 			}catch (Exception e){
 				e.printStackTrace();
 			}
@@ -189,41 +198,72 @@ public class Data {
      * @param ips 本地所有IP地址
      * @return 定时器时间
      */
-	public String getTimer(Connection connection,List<String> ips){
+	public Timer getTimer(Connection connection,List<String> ips) {
 
-	    String timer = "-1";
         Statement statement = null;
         ResultSet resultSet = null;
-        StringBuilder querySqlStr = new StringBuilder("SELECT SC_DATE FROM SE_SCANCONFIGURATION WHERE SC_FLAG = 0 AND SD_IP='" + ips.get(0) + "'");
-        for (int i = 1;i < ips.size();i ++){
-            querySqlStr.append("OR SD_IP='").append(ips.get(i)).append("' ");
-        }
-        StringBuilder updateSqlStr = new StringBuilder("UPDATE SE_SCANCONFIGURATION SET SC_FLAG = 1 WHERE SD_IP != '*' AND SD_IP ='" + ips.get(0) + "'");
-        for (int i = 1;i < ips.size();i ++){
-            updateSqlStr.append("OR SD_IP='").append(ips.get(i)).append("' ");
-        }
+        List<Timer> timerList = new ArrayList<>();
+
         try {
             statement = connection.createStatement();
-            resultSet = statement.executeQuery(querySqlStr.toString());
-            if (resultSet.next()){
-                timer = resultSet.getString(1);
+            resultSet = statement.executeQuery("SELECT * FROM SE_SCANCONFIGURATION WHERE SC_FLAG = 0");
+            while (resultSet.next()) {
+                String ip = resultSet.getString("SD_IP");
+                Time time = resultSet.getTime("SC_DATE");
+
+                Timer timer = new Timer(ip, time);
+                timerList.add(timer);
             }
-            statement.executeUpdate(updateSqlStr.toString());//查询后更新已有IP的定时器
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            try {
+                Objects.requireNonNull(resultSet).close();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+            try {
+                Objects.requireNonNull(statement).close();
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        Timer allIpTimer = new Timer();//如果定时器表中没有所有IP的定时器,使用默认定时器
+        for (Timer timer : timerList) {
+            String ip = timer.getIp();
+            if (ips.contains(ip)) {
+                timer.setFlag(Timer.SINGER_IP_TIMER_UNUSED);
+                return timer;
+            }
+            if (ip.equals("*")) {
+                timer.setFlag(Timer.ALL_IP_TIMER);
+                allIpTimer = timer;
+            }
+        }
+
+        return allIpTimer;
+    }
+
+    /**
+     * 更新用过的IP定时器
+     * @param connection 数据库连接
+     * @param ip 目的IP地址
+     */
+    public void updateSingleIpTimer(Connection connection,String ip) {
+
+        Statement statement = null;
+        try {
+            statement = connection.createStatement();
+            statement.executeUpdate("UPDATE SE_SCANCONFIGURATION SET SC_FLAG = 1 WHERE SD_IP = '" + ip + "'");
         }catch (Exception e){
-            LOGGER.error("getTimer:" + querySqlStr + "\n" + "getTimer:" + e.getMessage() + "\n" + "getTimer:" + updateSqlStr + "\n" + "getTimer:" + e.getMessage());
+            e.printStackTrace();
         }finally {
             try {
                 Objects.requireNonNull(statement).close();
             }catch (Exception e){
                 e.printStackTrace();
             }
-            try {
-                Objects.requireNonNull(resultSet).close();
-            }catch (Exception e){
-                e.printStackTrace();
-            }
         }
-        return timer;
     }
 
     /**
