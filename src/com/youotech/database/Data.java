@@ -51,7 +51,7 @@ public class Data {
 	public List<Set<String>> selectRules(Connection connection, String os, String bit){
 		Statement statement = null;
 		ResultSet resultSet = null;
-		String sqlStr = String.format("SELECT SR_TYPE,SR_RNAME FROM SE_RULES WHERE SD_OS='%s' AND SD_OSTYPE='%s'", os, bit);
+		String sqlStr = String.format("SELECT SR_TYPE,SR_RNAME FROM SE_RULES WHERE SD_TYPE = '主机设备' AND SD_OS='%s' AND SD_OSTYPE='%s'", os, bit);
 		Set<String> tcpList = new HashSet<>();
 		Set<String> udpList = new HashSet<>();
 		Set<String> softList = new HashSet<>();
@@ -93,12 +93,12 @@ public class Data {
 
     /**
      * 删除当天的扫描结果,插入新的扫描结果
-     * @param connection
-     * @param list
-     * @param sdId
-     * @param flag
+     * @param connection 连接
+     * @param list 扫描结果
+     * @param sdId 设备id
+     * @param flag 标志位
      */
-	public void insertResult(Connection connection, List<String> list,int sdId,int flag){
+	public void insertResult(Connection connection, Set<String> list,int sdId,int flag){
 
 		Statement deleteStatement = null;
 		int flag1 = flag;

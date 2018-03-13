@@ -5,6 +5,7 @@ import com.youotech.scan.Scanner;
 import com.youotech.timer.TimerThread;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
+import utils.InSensitiveSet;
 import utils.PropertiesUtils;
 import utils.Tools;
 
@@ -27,6 +28,14 @@ public class Main{
 
         TimerThread timerThread = new TimerThread();
         timerThread.run();
+
+        /*InSensitiveSet inSensitiveSet = new InSensitiveSet();
+        inSensitiveSet.add("Abc");
+        inSensitiveSet.add("aBc");
+        inSensitiveSet.add("AbC");
+        System.out.println(
+                inSensitiveSet.contains("abc")
+        );*/
     }
 
     /**
@@ -42,7 +51,12 @@ public class Main{
 	    calendar.set(Calendar.HOUR_OF_DAY, time.getHours());// 控制时
 	    calendar.set(Calendar.MINUTE, time.getMinutes());// 控制分
 	    calendar.set(Calendar.SECOND, time.getSeconds());// 控制秒
-	    Date date = calendar.getTime();
+	    Date timerDate = calendar.getTime();
+	    Date currentDate = new Date(System.currentTimeMillis());
+	    if (currentDate.after(timerDate)){//如果定时器时间晚于当前时间,则将定时器日期改为当前日期的后一天
+            timerDate.setDate(currentDate.getDate() + 1);
+        }
+
 	    Timer timer = new Timer();
 	    timerTask = new TimerTask() {
             @Override
@@ -54,7 +68,7 @@ public class Main{
                 }
             }
         };
-	    timer.scheduleAtFixedRate(timerTask, date,1000 * PropertiesUtils.getPeriod());
+	    timer.scheduleAtFixedRate(timerTask, timerDate,1000 * PropertiesUtils.getPeriod());
     }
 
     /**
@@ -76,7 +90,7 @@ public class Main{
         Data data = new Data();
 	    Connection connection = data.getConnection();//获取数据库连接
 
-	    /*String osName = PropertiesUtils.getOsName();//操作系统名称
+	    String osName = PropertiesUtils.getOsName();//操作系统名称
 	    String osArch = PropertiesUtils.getOsArch();//操作系统构架
 	    LOGGER.info(String.format("本机操作系统名称:%s,架构:%s",osName,osArch));
 
@@ -103,11 +117,11 @@ public class Main{
 
 	    Scanner scanner = new Scanner();
 	    //检测TCP端口
-	    List<String> errTcpList = scanner.tcpPortCheck(ruleLists.get(0));
+        Set<String> errTcpList = scanner.tcpPortCheck(ruleLists.get(0));
 	    LOGGER.info("异常TCP端口:" + errTcpList);
 	    data.insertResult(connection,errTcpList,sdId,0);
 	    //检测UDP端口
-	    List<String> errUdpList = scanner.udpPortCheck(ruleLists.get(1));
+        Set<String> errUdpList = scanner.udpPortCheck(ruleLists.get(1));
 	    LOGGER.info("异常UDP端口:" + errUdpList);
 	    data.insertResult(connection,errUdpList,sdId,1);
 	    //检测软件
@@ -116,7 +130,7 @@ public class Main{
 	    for (String str : tempSoftRuleSet){
 		    softRuleSet.add(str.toUpperCase());
 	    }
-	    List<String> errSoftList = scanner.softCheck(softRuleSet);
+	    Set<String> errSoftList = scanner.softPatchCheck(softRuleSet);
 
 	    LOGGER.info("异常软件列表:" + errSoftList);
 	    data.insertResult(connection,errSoftList,sdId,2);
@@ -134,10 +148,9 @@ public class Main{
         for (String s:errSoftList){
             logStr.append(s).append(",");
         }
-	    data.insertLog(connection,"1",logStr.toString());*/
+	    data.insertLog(connection,"1",logStr.toString());
 
-	    System.out.println("-----------运行-----------");
-
+        //更新定时器标志位
         if (timer.getFlag() == SINGER_IP_TIMER_UNUSED) {
             synchronized (SYNCHRONIZED_FLAG) {
                 TimerThread.flag = SINGER_IP_TIMER_USED;
